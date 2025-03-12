@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=NOTmyname@12!
+      - MYSQL_DATABASE=django-rsf
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=NOTmyname@12!
+    volumes:
+      - db-data:/var/lib/mysql
+    restart: always
+
+  redis:
+    image: redis:7.0.5-alpine
+    ports:
+      - "6379:6379"
+    restart: always
+
+  api:
+    build: .
+    environment:
+      - DJANGO_SETTINGS_MODULE=backend.settings
+      - DATABASE_URL=mysql://root:NOTmyname@12!@db:3306/django-rsf
+      - REDIS_URL=redis://redis:6379/1
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    restart: always
+
+  celery:
+    build: .
+    command: celery -A backend worker --loglevel=info
+    environment:
+      - DJANGO_SETTINGS_MODULE=backend.settings
+      - DATABASE_URL=mysql://root:NOTmyname@12!@db:3306/django-rsf
+      - REDIS_URL=redis://redis:6379/1
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    depends_on:
+      - db
+      - redis
+    restart: always
+
+  flower:
+    image: mher/flower:1.1.0
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/1
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+    restart: always
+
+volumes:
+  db-data:
